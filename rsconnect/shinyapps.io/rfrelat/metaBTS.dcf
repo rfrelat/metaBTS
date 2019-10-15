@@ -1,0 +1,13 @@
+name: metaBTS
+title: metaBTS
+username:
+account: rfrelat
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 938886
+bundleId: 2502610
+url: https://rfrelat.shinyapps.io/metabts/
+when: 1571159158.92783
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: addDataset_old.R|addDataset.R|Metadata19052019.dbf|Metadata19052019.prj|Metadata19052019.shp|Metadata19052019.shx|Metadata19072019.dbf|Metadata19072019.prj|Metadata19072019.shp|Metadata19072019.shx|Tools.R

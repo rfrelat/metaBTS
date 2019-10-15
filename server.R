@@ -22,7 +22,8 @@ bounds<-bbox(shape)
 
 # Get the income data 
 # income_long<-read.csv("Data/income_long.csv")
-
+shape$Opn_ccs <- gsub("1", "TRUE", shape$Opn_ccs)
+shape$Opn_ccs <- gsub("0", "FALSE", shape$Opn_ccs)
 
 server <- function(input, output, session){
   
@@ -75,16 +76,14 @@ server <- function(input, output, session){
                             "</strong><br>",
                             theData$nbHauls,
                             " hauls <br> ",
-                            theData$nbTaxa, 
-                            " taxa <br>",
                             "Year: ",
                             as.character(theData$minYear),
                             " - ",
                             as.character(theData$maxYear),
                             "<br> Depth: ",
-                            as.character(round(theData$minDpth)),
+                            as.character(round(as.numeric(as.character(theData$minDpth)))),
                             " - ",
-                            as.character(round(theData$maxDpth)), 
+                            as.character(round(as.numeric(as.character(theData$maxDpth)))), 
                             "m <br><strong>Open access: ", 
                             theData$Opn_ccs, 
                             "</strong><br>",
