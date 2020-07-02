@@ -3,6 +3,7 @@ library(tidyr)
 library(leaflet)
 library(rgdal)
 library(DT)
+library(sf)
 
 #Get the latest shapefile
 listshape <- list.files(".", pattern = "shp")
