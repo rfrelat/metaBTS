@@ -82,7 +82,7 @@ server <- function(input, output, session){
                             "Region: ",
                             as.character(theData$Area),
                             "<br> Year: ",
-                            as.character(theData$minYear),
+                            as.character(ifelse(is.na(theData$First_year), theData$minYear, theData$First_year)),
                             " - ",
                             as.character(theData$maxYear),
                             "<br> Depth: ",
