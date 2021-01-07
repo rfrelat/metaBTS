@@ -5,9 +5,9 @@ account: rfrelat
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 938886
-bundleId: 4064022
+bundleId: 4068998
 url: https://rfrelat.shinyapps.io/metabts/
-when: 1609931385.74227
+when: 1610037145.29265
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: issues.txt|Metadata_18062020.csv|Metadata_18062020.dbf|Metadata_18062020.prj|Metadata_18062020.shp|Metadata_18062020.shx|README.md|simpleShp.R
+ignoredFiles: issues.txt|Metadata_07012021.dbf|Metadata_07012021.prj|Metadata_07012021.shp|Metadata_07012021.shx|README.md|simpleShp.R
