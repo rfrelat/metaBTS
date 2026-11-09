@@ -1,120 +1,129 @@
-library(dplyr)
-library(tidyr)
-library(leaflet)
-library(rgdal)
-library(DT)
+# library(dplyr)
+# library(tidyr)
+
+# library(DT)
 library(sf)
+library(leaflet)
 
 #Get the latest shapefile
 listshape <- list.files(".", pattern = "shp")
 simpleshape <- listshape[grep("_S.shp", listshape)]
-# dateshape <- as.Date(substr(listshape, 10, 17), format="%d%m%Y")
-# lastshape <- listshape[which.max(dateshape)]
-shape<-readOGR(dsn=simpleshape, layer=gsub("\\.shp", "", simpleshape))
-#proj4string(shape)
+shape <- sf::st_read(simpleshape, quiet = TRUE)
 
 # Add right and left polygons
-shape0 <- (st_geometry(st_as_sf(shape)))
-shapeE <- shape0 + c(360,0)
-shapeW <- shape0 - c(360,0)
-shape3 <- c(shape0, shapeE, shapeW)
-shape3 <- sf::as_Spatial(shape3)
+shapeE <- shape
+st_geometry(shapeE) <- st_geometry(shapeE) + c(360, 0)
+st_crs(shapeE) <- st_crs(shape)
 
-newdf <- rbind(shape@data, shape@data, shape@data)
-row.names(newdf) <- names(shape3)
-shape3 <- SpatialPolygonsDataFrame(shape3, newdf)
-# transform to WGS884 reference system 
-shape<-spTransform(shape3, CRS("+init=epsg:4326"))
+shapeW <- shape
+st_geometry(shapeW) <- st_geometry(shape) - c(360, 0)
+st_crs(shapeW) <- st_crs(shape)
+
+shape_all <- rbind(shape, shapeE, shapeW)
 
 # Find the edges of our map
-bounds<-bbox(shape)
+bounds <- st_bbox(shape_all)
+centre <- c(mean(bounds[c("xmin", "xmax")]), mean(bounds[c("ymin", "ymax")]))
 
-server <- function(input, output, session){
-  
-  getDataSet<-reactive({
-    subDataset <- shape
-  })
-  
+# Colour per open-access status (same colours as the original app)
+status_cols <- c(
+  "Publicly available" = "blue",
+  "Partly publicly available" = "orange",
+  "Available upon request" = "purple",
+  "Not publicly available" = "red",
+  "Incomplete metadata" = "black"
+)
+
+# Draw the most open surveys last so they sit on top
+draw_order <- order(
+  match(shape_all$Opn_ccs, rev(names(status_cols))),
+  na.last = TRUE
+)
+shape_all <- shape_all[draw_order, ]
+
+fill_col <- unname(status_cols[as.character(shape_all$Opn_ccs)])
+# fill_col[is.na(fill_col)] <- "grey70"
+
+first_year <- ifelse(
+  is.na(shape_all$First_year),
+  as.character(shape_all$minYear),
+  as.character(shape_all$First_year)
+)
+
+provider <- ifelse(
+  is.na(shape_all$link),
+  as.character(shape_all$Providr),
+  paste0(
+    "<a href='",
+    shape_all$link,
+    "' target='_blank' rel='noopener'>",
+    shape_all$Providr,
+    "</a>"
+  )
+)
+
+contact <- ifelse(
+  is.na(shape_all$Contact),
+  "",
+  paste0("<br>Contact: ", shape_all$Contact)
+)
+
+min_depth <- round(as.numeric(as.character(shape_all$minDpth)))
+max_depth <- round(as.numeric(as.character(shape_all$maxDpth)))
+
+popup_txt <- paste0(
+  "<strong>Survey: ",
+  shape_all$Survey,
+  "</strong><br>",
+  shape_all$nbHauls,
+  " stations<br>",
+  "Region: ",
+  shape_all$Area,
+  "<br>",
+  "Years: ",
+  first_year,
+  " - ",
+  as.character(shape_all$maxYear),
+  "<br>",
+  "Depth: ",
+  min_depth,
+  " - ",
+  max_depth,
+  " m<br>",
+  "<strong>Open access: ",
+  shape_all$Opn_ccs,
+  "</strong><br>",
+  "Provider: ",
+  provider,
+  contact
+)
+
+server <- function(input, output, session) {
   # Due to use of leafletProxy below, this should only be called once
-  output$Map<-renderLeaflet({
-   
-      leaflet() %>%
+  output$Map <- renderLeaflet({
+    leaflet(shape_all) %>%
       addTiles() %>%
-      
+      addPolygons(
+        fillColor = fill_col,
+        fillOpacity = 0.8,
+        color = "#BDBDC3",
+        weight = 1,
+        popup = popup_txt,
+        highlightOptions = highlightOptions(
+          weight = 3,
+          color = "#333333",
+          fillOpacity = 0.9,
+          bringToFront = TRUE
+        )
+      ) %>%
+      addLegend(
+        position = "bottomright",
+        colors = unname(status_cols),
+        labels = names(status_cols),
+        title = "Open access",
+        opacity = 0.8
+      ) %>%
       # Centre the map in the middle of our co-ordinates
-      setView(mean(bounds[1,]),
-              mean(bounds[2,]),
-              zoom=2 # set to 2
-      )
+      setView(lng = centre[1], lat = centre[2], zoom = 2)
   })
-  
-  
-  
-  observe({
-    theData<-getDataSet() 
-    
-    # colour palette mapped to data
-    colOA <- list("Publicly available" = "blue",
-                  "Partly publicly available" = "orange",
-                  "Available upon request" = "purple",
-                  "Not publicly available"= "red",
-                  "Incomplete metadata"="black")
-    
-    oafac <- factor(theData$Opn_ccs, levels = rev(names(colOA)), 
-                    ordered = TRUE)
-    shapeOr <- order(oafac)
-    theData <- theData[shapeOr, ]
-    theData@plotOrder <- 1:length(theData)
-    
-    oa <- unlist(colOA[as.character(theData$Opn_ccs)])
-    names(oa) <- NULL
-    
-    prov <- ifelse(is.na(theData$link), as.character(theData$Providr), 
-                   paste0("<a href= '", theData$link, "' target='_blank'>", theData$Providr, "</a>"))
-    cont <- ifelse(is.na(theData$Contact), "", paste0("Contact: ", theData$Contact))
-
-    # set text for the clickable popup labels
-    borough_popup <- paste0("<strong>Survey: ", 
-                            theData$Survey, 
-                            "</strong><br>",
-                            theData$nbHauls,
-                            " stations <br> ",
-                            "Region: ",
-                            as.character(theData$Area),
-                            "<br> Year: ",
-                            as.character(ifelse(is.na(theData$First_year), theData$minYear, theData$First_year)),
-                            " - ",
-                            as.character(theData$maxYear),
-                            "<br> Depth: ",
-                            as.character(round(as.numeric(as.character(theData$minDpth)))),
-                            " - ",
-                            as.character(round(as.numeric(as.character(theData$maxDpth)))), 
-                            "m <br><strong>Open access: ", 
-                            theData$Opn_ccs, 
-                            "</strong><br>",
-                            "Provider: ",
-                            prov, "<br>",
-                            cont)    
-    # If the data changes, the polygons are cleared and redrawn, however, the map (above) is not redrawn
-    leafletProxy("Map", data = theData) %>%
-      clearShapes() %>%
-      addPolygons(data = theData,
-                  fillColor = oa, 
-                  fillOpacity = 0.8, 
-                  color = "#BDBDC3", 
-                  weight = 2,
-                  popup = borough_popup)  
-  })
-  
-  # table of results, rendered using data table
-  # output$Table <- renderDataTable(datatable({
-  #   dataSet<-getDataSet()
-  #   dataSet<-dataSet@data#[,1:10] # Just get name and value columns
-  #   #names(dataSet)<-c("Borough",paste0(input$meas," income") )
-  #   dataSet
-  #   }#,
-  # )
-    #options = list(lengthMenu = c(5, 10, 33), pageLength = 5))
-  #)
-    
 }
